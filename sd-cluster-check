@@ -43,35 +43,27 @@ for path in args[1:]:
 ###
 print str(len(sosreport_list))+" sosreport(s) found, processing them now"
 
-def check_ip ( sosreport, ip ):
-    "Check if IP is present on system"
-    ipaddr = False
-    ifconfig = False
+def check_ip ( sosreport_path, ip ):
+    "Check if IP address is active on system"
     mymatch = None
     ## check if we have networking information
-    if (os.path.isfile(sosreport+'/sos_commands/networking/ip_-o_addr')):
-        ifile = open(sosreport+'/sos_commands/networking/ip_-o_addr', 'r')
-        ipaddr = True
-    elif (os.path.isfile(sosreport+'/sos_commands/networking/ifconfig_-a')):
-        ifile = open(sosreport+'/sos_commands/networking/ifconfig_-a', 'r')
-        ifconfig = True
-    else:
-        print "!! no networking information"
-        return False
-    ###
-    if ifconfig:
-        ip_match = re.compile(r"^.*inet addr:" + re.escape(ip) + "\s+.*$")
-        for line in ifile.readlines():
-            mymatch = ip_match.search(line)
-            if mymatch:
-                return True
-    if ipaddr:
+    if (os.path.isfile(sosreport_path+'/sos_commands/networking/ip_-o_addr')):
+        ifile = open(sosreport_path+'/sos_commands/networking/ip_-o_addr', 'r')
         ip_match = re.compile(r"^.*inet " + re.escape(ip) + "/.*$")
         for line in ifile.readlines():
             mymatch = ip_match.search(line)
             if mymatch:
                 return True
-    return False
+    elif (os.path.isfile(sosreport_path+'/sos_commands/networking/ifconfig_-a')):
+        ifile = open(sosreport_path+'/sos_commands/networking/ifconfig_-a', 'r')
+        ip_match = re.compile(r"^.*inet addr:" + re.escape(ip) + "\s+.*$")
+        for line in ifile.readlines():
+            mymatch = ip_match.search(line)
+            if mymatch:
+                return True
+    else:
+        print "[e] sosreport doesn't containt any networking information ('ifconfig' nor 'ip addr')"
+        return False
 
 for sosreport in sosreport_list:
     print ""
