@@ -41,7 +41,7 @@ for path in args[1:]:
             print 'found '+'/'.join(row_data[0:-1])
             sosreport_list.append('/'.join(row_data[0:-1]))
 ###
-print str(len(sosreport_list))+" sosreport(s) found, processing them now"
+print "[i] " + str(len(sosreport_list))+" sosreport(s) found, processing them now"
 
 def check_ip ( sosreport_path, ip ):
     "Check if IP address is active on system"
@@ -65,105 +65,139 @@ def check_ip ( sosreport_path, ip ):
         print "[e] sosreport doesn't containt any networking information ('ifconfig' nor 'ip addr')"
         return False
 
+def parse_cluster_name ( sosreport_path ):
+    cluster_name = ""
+    in_cluster_conf = False
+    in_corosync_conf = False
+    cluster_type = "unknown"
+
+    if (os.path.isfile(sosreport_path+'/etc/cluster/cluster.conf')):
+        cluster_conf = ET.parse(sosreport_path+'/etc/cluster/cluster.conf')
+        root = cluster_conf.getroot()
+        if 'name' in root.attrib:
+            cluster_name = root.attrib['name']
+            in_cluster_conf = True
+            if len(root.findall('.//fencedevice[@agent="fence_pcmk"]')) > 0:
+                cluster_type = "pacemaker"
+            else:
+                cluster_type = "rgmanager"
+
+    if (os.path.isfile(sosreport_path+'/etc/corosync/corosync.conf')):
+        corosync_conf = open(sosreport_path+'/etc/corosync/corosync.conf', 'r')
+        cl_name = re.compile(r"cluster_name\s*:\s*([\w.-]+)\s*", re.M+re.S)
+        match_name = cl_name.search(corosync_conf.read())
+        if match_name:
+            cluster_name = match_name.group(1)
+            in_corosync_conf = True
+            cluster_type = "pacemaker"
+
+    return cluster_name, in_cluster_conf, in_corosync_conf, cluster_type
+
+def parse_corosync_conf_nodes ( sosreport_path, cluster_nodes ):
+    corosync_conf = open(sosreport_path+'/etc/corosync/corosync.conf', 'r')
+    nodes = re.compile(r"node\s*\{([^}]+)\}", re.M+re.S)
+    nodes_list = nodes.findall(corosync_conf.read())
+    if len(nodes_list) > 0:
+        n_name = re.compile(r"ring0_addr\s*:\s*([\w.-]+)\s*", re.M)
+        n_id = re.compile(r"nodeid\s*:\s*(\d+)\s*", re.M)
+        for node in nodes_list:
+            n_name2 = None
+            n_id2 = None
+
+            n_name2 = n_name.search(node)
+            n_id2 = n_id.search(node)
+            if n_name2 and n_id2:
+                node_name = n_name2.group(1)
+                node_id = n_id2.group(1)
+                if node_id not in cluster_nodes:
+                    cluster_nodes[node_id] = { 'name': node_name, 'node_id': node_id}
+            else:
+                continue
+
+def parse_cluster_conf_nodes ( sosreport_path, cluster_nodes ):
+    cluster_conf = ET.parse(sosreport_path+'/etc/cluster/cluster.conf')
+    root = cluster_conf.getroot()
+    for node in root.findall('.//clusternode'):
+        if 'nodeid' in node.attrib and 'name' in node.attrib and node.attrib['nodeid'] not in cluster_nodes:
+            cluster_nodes[node.attrib['nodeid']] = { 'name': node.attrib['name'], 'node_id': node.attrib['nodeid'] }
+
+def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
+    hostname = open(sosreport_path+'/sos_commands/general/hostname','r').readlines()[0].rstrip('\n')
+    for node in cluster_nodes:
+        mymatch = None
+        host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+)\s+" + cluster_nodes[node]['name'] + "(\s+.*|$)")
+        hosts_file = open(sosreport_path+'/etc/hosts','r')
+        # find first matching hostname with IP
+        for line in hosts_file.readlines():
+            mymatch = host_match.search(line)
+            if mymatch:
+                break
+        if mymatch:
+            if 'ip' not in cluster_nodes[node]:
+                cluster_nodes[node]['ip'] = {}
+            if '==global==' not in cluster_nodes[node]['ip']:
+                cluster_nodes[node]['ip']['==global=='] = mymatch.group('ip')
+            elif cluster_nodes[node]['ip']['==global=='] != mymatch.group('ip'):
+                print "[w] Inconsistent naming in /etc/hosts accross nodes detected !!!"
+            cluster_nodes[node]['ip'][hostname] = mymatch.group('ip')
+            ## checing if we can match IP to this host sosreport
+
+            if check_ip (sosreport_path, mymatch.group('ip')):
+                cluster_nodes[node]['has_sos_report'] = True
+                if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+cluster_nodes[node]['name'])):
+                    cluster_nodes[node]['has_crm_report'] = True
+        else:
+            print "[w] Not possible to determine cluster node IP, no record in /etc/hosts! -  "+cluster_nodes[node]['name']
+
 for sosreport in sosreport_list:
-    print ""
+    # initial variable setup
     cluster_name = ""
 
-    # give up if we don't have a sos_commands/cluster directory
+    # warn if no /sos_commands/cluster directory is found - most probably this won't be a cluster
     if not (os.path.isdir(sosreport+'/sos_commands/cluster')):
-        print "NO RH CLUSTER here"
-        continue
-    print "# we have a cluster dir"
+        print "[w] sos_commands/cluster not present in "+sosreport
 
-## rgmanager cluster part
-    if (os.path.isfile(sosreport+'/etc/cluster/cluster.conf')):
-        print "## /etc/cluster/cluster.conf detected"
-        tree = ET.parse(sosreport+'/etc/cluster/cluster.conf')
-        clusterroot = tree.getroot()
-        cluster_name = clusterroot.attrib['name']
-        if cluster_name not in clusters:
-            clusters[cluster_name] = {}
-        # get node ids
-        for node in clusterroot.findall('.//clusternode'):
-            if node.attrib['nodeid'] not in clusters[cluster_name]:
-                clusters[cluster_name][node.attrib['nodeid']] = { 'name': node.attrib['name'], 'node_id': node.attrib['nodeid'], 'has_crm_report': False, 'has_sos_report': False }
-            ###
-            mymatch = None
-            host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+)\s+" + node.attrib['name'] + "(\s+.*|$)")
-            hfile = open(sosreport+'/etc/hosts','r')
-            for line in hfile.readlines():
-                mymatch = host_match.search(line)
-                if mymatch:
-                    break
-            if mymatch:
-                clusters[cluster_name][node.attrib['nodeid']]['ip'] = mymatch.group('ip')
-                if check_ip (sosreport, mymatch.group('ip')):
-                    clusters[cluster_name][node.attrib['nodeid']]['has_sos_report'] = True
-                    if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+node.attrib['name'])):
-                        clusters[cluster_name][node.attrib['nodeid']]['has_crm_report'] = True
-            ###
+    # 1. try to determine cluster_name
+    #    -> this will also tell us if this is rgmanager or pacemaker cluster
+    cluster_name, in_cluster_conf, in_corosync_conf, cluster_type = parse_cluster_name(sosreport)
+    if len(cluster_name) > 0 and cluster_name not in clusters:
+        clusters[cluster_name] = { 'nodes': {}, 'type': cluster_type }
 
-## pacemaker cluster part
-    if (os.path.isfile(sosreport+'/etc/corosync/corosync.conf')):
-        print "## we see corosync.conf, lets parse it"
-        file_coro = open(sosreport+'/etc/corosync/corosync.conf', 'r')
-        # cluster name
-        cl_name = re.compile(r"cluster_name\s*:\s*(\w+)\s*$", re.M+re.S)
-        cl_name2 = cl_name.search(file_coro.read())
-        if cl_name2:
-            cluster_name = cl_name2.group(1)
-            if cluster_name not in clusters:
-                clusters[cluster_name] = {}
-        else:
-            break ## FIXME we are getting too deep
-        # node list
-        nodes = re.compile(r"node\s*\{([^\}.]+)\}", re.M+re.S)
-        file_coro = open(sosreport+'/etc/corosync/corosync.conf', 'r')
-        nodes_list = nodes.findall(file_coro.read())
-        if len(nodes_list) > 0:
-            print "### found some nodes"
-            n_name = re.compile(r"ring0_addr\s*:\s*(\w+)\s*$", re.M)
-            n_id = re.compile(r"nodeid\s*:\s*(\d+)\s*$", re.M)
-            for node in nodes_list:
-                n_name2 = None
-                n_id2 = None
-                n_name2 = n_name.search(node)
-                n_id2 = n_id.search(node)
-                if n_name2 and n_id2:
-                    node_name = n_name2.group(1)
-                    node_id = n_id2.group(1)
-                    print node_name+" $$ "+node_id
-                    if node_id not in clusters[cluster_name]:
-                        clusters[cluster_name][node_id] = { 'name': node_name, 'node_id': node_id, 'has_crm_report': False, 'has_sos_report': False}
-                    else:
-                        print "not adding "+node_name+"@"+node_id
-                else:
-                    continue
-                ###
-                mymatch = None
-                host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+)\s+" + node_name + "(\s+.*|$)")
-                hfile = open(sosreport+'/etc/hosts','r')
-                for line in hfile.readlines():
-                    mymatch = host_match.search(line)
-                    if mymatch:
-                        break
-                if mymatch:
-                    clusters[cluster_name][node_id]['ip'] = mymatch.group('ip') 
-                    if check_ip (sosreport, mymatch.group('ip')):
-                        clusters[cluster_name][node_id]['has_sos_report'] = True
-                        if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+node_name)):
-                            clusters[cluster_name][node_id]['has_crm_report'] = True
-                            
-                ###
+    # 2. based on cluster type parse the node names and IDs
+    if in_corosync_conf:
+        # parse pacemaker nodes - this is most probably RHEL 7 system
+        parse_corosync_conf_nodes(sosreport,clusters[cluster_name]['nodes'])
+    if in_cluster_conf:
+        # parse cluster.conf nodes (on RHEL 6 pacemaker node names
+        # and IDs are in cluster.conf and corosync.conf doesn't exists there
+        parse_cluster_conf_nodes(sosreport,clusters[cluster_name]['nodes'])
 
+    # 3. Once we have nodes, parse the /etc/hosts file to determine if we can tell from which
+    #    node this sosreport is (TODO note somewhere the look at IP addresses of other nodes
+    #    to check if we have a consistent look - detection of missing/missconfigured /etc/hosts)
+    if in_cluster_conf or in_corosync_conf:
+        match_nodes_to_hosts(sosreport, clusters[cluster_name]['nodes'])
+
+    # 4. Assign any additional attributes to cluster from this sosreport
+
+###################################################
 print "======"
 from operator import attrgetter, itemgetter
 for cl in clusters:
-    print "=== CLUSTER  "+cl
+    print "=== CLUSTER  " + cl + " ( " + clusters[cl]['type'] + " )"
     print "{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format('#','node name', 'crm', 'sos', 'IP address')
     #for n in clusters[cl]:
-    for n in sorted(clusters[cl], key=int):
-        if 'ip' in clusters[cl][n]:
-            print "{0:2s} {1:20s} {2:3b} {3:3b} {4:15s}".format(n, clusters[cl][n]['name'], clusters[cl][n]['has_crm_report'], clusters[cl][n]['has_sos_report'], clusters[cl][n]['ip'])
+    for n in sorted(clusters[cl]['nodes'], key=int):
+        if 'has_sos_report' in clusters[cl]['nodes'][n]:
+            has_sos = True
         else:
-            print "{0:2s} {1:20s} {2:3b} {3:3b} {4:15s}".format(n, clusters[cl][n]['name'], clusters[cl][n]['has_crm_report'], clusters[cl][n]['has_sos_report'], 'undetected')
+            has_sos = False
+        if 'has_crm_report' in clusters[cl]['nodes'][n]:
+            has_crm = True
+        else:
+            has_crm = False
+        if 'ip' in clusters[cl]['nodes'][n] and '==global==' in clusters[cl]['nodes'][n]['ip']:
+            show_ip = clusters[cl]['nodes'][n]['ip']['==global==']
+        else:
+            show_ip = 'undetected'
+        print "{0:2s} {1:20s} {2:3b} {3:3b} {4:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_crm, has_sos, show_ip)
