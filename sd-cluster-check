@@ -27,12 +27,12 @@ import subprocess
 try:
     opts, args = getopt.getopt(sys.argv,"h",[])
 except getopt.GetoptError:
-    print "error parsing arguments"
+    print("error parsing arguments")
     sys.exit(2)
 
-print "== sd-cluster-check v0.1 =="
+print("== sd-cluster-check v0.1 ==")
 if len(sys.argv) == 1:
-    print """
+    print ("""
 sd-cluster-check path/sos_report1 [path/sos_report2] ...
 sd-cluster-check path/dir_with_sosreports1 [path/dir_with_sosreports2] ...
 
@@ -47,21 +47,21 @@ Thanks to that you can tell from which nodes you are missing sosreports.
 To request features or report bug you can create issue on github or email it.
 https://github.com/OndrejHome/sd-cluster-check/issues
 ofamera@redhat.com
-    """
+    """)
     sys.exit(0)
 
 sosreport_list = []
-print "Searching for sosreports in given path(s)"
+print("Searching for sosreports in given path(s)")
 for path in args[1:]:
-    print "path: "+path
+    print("path: "+path)
     output = subprocess.check_output("find "+path+" -maxdepth 3 -name sos_commands -type d", shell=True)
-    for row in output.split('\n'):
+    for row in output.decode('utf-8').split('\n'):
         if len(row) > 0:
             row_data = row.split('/')
-            print 'found '+'/'.join(row_data[0:-1])
+            print('found '+'/'.join(row_data[0:-1]))
             sosreport_list.append('/'.join(row_data[0:-1]))
 ###
-print "[i] " + str(len(sosreport_list))+" sosreport(s) found, processing them now"
+print("[i] " + str(len(sosreport_list))+" sosreport(s) found, processing them now")
 
 def check_ip ( sosreport_path, ip ):
     "Check if IP address is active on system"
@@ -82,7 +82,7 @@ def check_ip ( sosreport_path, ip ):
             if mymatch:
                 return True
     else:
-        print "[e] sosreport doesn't containt any networking information ('ifconfig' nor 'ip addr')"
+        print("[e] sosreport doesn't containt any networking information ('ifconfig' nor 'ip addr')")
         return False
 
 def parse_cluster_name ( sosreport_path ):
@@ -158,7 +158,7 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
             if '==global==' not in cluster_nodes[node]['ip']:
                 cluster_nodes[node]['ip']['==global=='] = mymatch.group('ip')
             elif cluster_nodes[node]['ip']['==global=='] != mymatch.group('ip'):
-                print "[w] Inconsistent naming in /etc/hosts accross nodes detected !!!"
+                print("[w] Inconsistent naming in /etc/hosts accross nodes detected !!!")
             cluster_nodes[node]['ip'][hostname] = mymatch.group('ip')
             ## checing if we can match IP to this host sosreport
 
@@ -167,7 +167,7 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
                 if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+cluster_nodes[node]['name'])):
                     cluster_nodes[node]['has_crm_report'] = True
         else:
-            print "[w] Not possible to determine cluster node IP, no record in /etc/hosts! -  "+cluster_nodes[node]['name'] + " sosreport: "+sosreport_path
+            print("[w] Not possible to determine cluster node IP, no record in /etc/hosts! -  "+cluster_nodes[node]['name'] + " sosreport: "+sosreport_path)
 
 for sosreport in sosreport_list:
     # initial variable setup
@@ -175,7 +175,7 @@ for sosreport in sosreport_list:
 
     # warn if no /sos_commands/cluster directory is found - most probably this won't be a cluster
     if not (os.path.isdir(sosreport+'/sos_commands/cluster')):
-        print "[w] sos_commands/cluster not present in "+sosreport
+        print("[w] sos_commands/cluster not present in "+sosreport)
 
     # 1. try to determine cluster_name
     #    -> this will also tell us if this is rgmanager or pacemaker cluster
@@ -201,11 +201,11 @@ for sosreport in sosreport_list:
     # 4. Assign any additional attributes to cluster from this sosreport
 
 ###################################################
-print "============ detected " + str(len(clusters)) + " cluster(s)"
+print("============ detected " + str(len(clusters)) + " cluster(s)")
 #from operator import attrgetter, itemgetter
 for cl in clusters:
-    print "==== " + cl + " ( " + clusters[cl]['type'] + " )"
-    print "{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format('#','node name', 'sos', 'crm', 'heartbeat IP')
+    print("==== " + cl + " ( " + clusters[cl]['type'] + " )")
+    print("{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format('#','node name', 'sos', 'crm', 'heartbeat IP'))
     #for n in clusters[cl]:
     for n in sorted(clusters[cl]['nodes'], key=int):
         if 'has_sos_report' in clusters[cl]['nodes'][n]:
@@ -221,6 +221,6 @@ for cl in clusters:
         else:
             show_ip = 'undetected'
         if clusters[cl]['type'] == 'pacemaker':
-            print "{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_sos, has_crm, show_ip)
+            print("{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_sos, has_crm, show_ip))
         elif clusters[cl]['type'] == 'rgmanager':
-            print "{0:2s} {1:20s} {2:7s} {3:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_sos, show_ip)
+            print("{0:2s} {1:20s} {2:7s} {3:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_sos, show_ip))
