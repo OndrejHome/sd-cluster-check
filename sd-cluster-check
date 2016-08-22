@@ -53,13 +53,16 @@ ofamera@redhat.com
 sosreport_list = []
 print("Searching for sosreports in given path(s)")
 for path in args[1:]:
-    print("path: "+path)
-    output = subprocess.check_output("find "+path+" -maxdepth 3 -name sos_commands -type d", shell=True)
-    for row in output.decode('utf-8').split('\n'):
-        if len(row) > 0:
-            row_data = row.split('/')
-            print('found '+'/'.join(row_data[0:-1]))
-            sosreport_list.append('/'.join(row_data[0:-1]))
+    if (os.path.isdir(path)):
+        print("path: "+path)
+        output = subprocess.check_output("find "+path+" -maxdepth 3 -name sos_commands -type d", shell=True)
+        for row in output.decode('utf-8').split('\n'):
+            if len(row) > 0:
+                row_data = row.split('/')
+                print('found '+'/'.join(row_data[0:-1]))
+                sosreport_list.append('/'.join(row_data[0:-1]))
+    else:
+        print("[e] path "+path+" is not a directory")
 ###
 print("[i] " + str(len(sosreport_list))+" sosreport(s) found, processing them now")
 
