@@ -145,7 +145,7 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
     hostname = open(sosreport_path+'/sos_commands/general/hostname','r').readlines()[0].rstrip('\n')
     for node in cluster_nodes:
         mymatch = None
-        host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+)\s+" + cluster_nodes[node]['name'] + "(\s+.*|$)")
+        host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+).*\s+" + cluster_nodes[node]['name'] + "(\s+.*|$)")
         hosts_file = open(sosreport_path+'/etc/hosts','r')
         # find first matching hostname with IP
         for line in hosts_file.readlines():
