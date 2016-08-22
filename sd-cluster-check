@@ -77,6 +77,13 @@ def check_ip ( sosreport_path, ip ):
             mymatch = ip_match.search(line)
             if mymatch:
                 return True
+    elif (os.path.isfile(sosreport_path+'/sos_commands/networking/ip_address')):
+        ifile = open(sosreport_path+'/sos_commands/networking/ip_address', 'r')
+        ip_match = re.compile(r"^.*inet " + re.escape(ip) + "/.*$")
+        for line in ifile.readlines():
+            mymatch = ip_match.search(line)
+            if mymatch:
+                return True
     elif (os.path.isfile(sosreport_path+'/sos_commands/networking/ifconfig_-a')):
         ifile = open(sosreport_path+'/sos_commands/networking/ifconfig_-a', 'r')
         ip_match = re.compile(r"^.*inet addr:" + re.escape(ip) + "\s+.*$")
@@ -85,7 +92,7 @@ def check_ip ( sosreport_path, ip ):
             if mymatch:
                 return True
     else:
-        print("[e] sosreport doesn't containt any networking information ('ifconfig' nor 'ip addr')")
+        print("[e] sosreport doesn't containt any networking information ('ifconfig' nor 'ip addr') - "+sosreport_path)
         return False
 
 def parse_cluster_name ( sosreport_path ):
