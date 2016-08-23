@@ -41,7 +41,7 @@ except getopt.GetoptError:
     print("error parsing arguments")
     sys.exit(2)
 
-print("== sd-cluster-check v0.1 ==")
+print("== sd-cluster-check v0.2 ==")
 if len(sys.argv) == 1:
     print ("""
 sd-cluster-check path/sos_report1 [path/sos_report2] ...
