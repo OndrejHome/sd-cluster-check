@@ -155,29 +155,36 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
     hostname = open(sosreport_path+'/sos_commands/general/hostname','r').readlines()[0].rstrip('\n')
     for node in cluster_nodes:
         mymatch = None
+        node_ip = ""
         host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+).*\s+" + cluster_nodes[node]['name'] + "(\s+.*|$)")
         hosts_file = open(sosreport_path+'/etc/hosts','r')
         # find first matching hostname with IP
         for line in hosts_file.readlines():
             mymatch = host_match.search(line)
             if mymatch:
+                node_ip = mymatch.group('ip')
                 break
-        if mymatch:
+        # try checking if the node name is not just IPv4 address
+        if not mymatch:
+            node_as_ip_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+)$")
+            if node_as_ip_match.match(cluster_nodes[node]['name']):
+                node_ip = cluster_nodes[node]['name']
+        if mymatch or len(node_ip) > 0:
             if 'ip' not in cluster_nodes[node]:
                 cluster_nodes[node]['ip'] = {}
             if '==global==' not in cluster_nodes[node]['ip']:
-                cluster_nodes[node]['ip']['==global=='] = mymatch.group('ip')
-            elif cluster_nodes[node]['ip']['==global=='] != mymatch.group('ip'):
+                cluster_nodes[node]['ip']['==global=='] = node_ip
+            elif cluster_nodes[node]['ip']['==global=='] != node_ip:
                 print("[w] Inconsistent naming in /etc/hosts accross nodes detected !!!")
-            cluster_nodes[node]['ip'][hostname] = mymatch.group('ip')
+            cluster_nodes[node]['ip'][hostname] = node_ip
             ## checing if we can match IP to this host sosreport
 
-            if check_ip (sosreport_path, mymatch.group('ip')):
+            if check_ip (sosreport_path, node_ip):
                 cluster_nodes[node]['has_sos_report'] = True
                 if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+cluster_nodes[node]['name'])):
                     cluster_nodes[node]['has_crm_report'] = True
         else:
-            print("[w] Not possible to determine cluster node IP, no record in /etc/hosts! -  "+cluster_nodes[node]['name'] + " sosreport: "+sosreport_path)
+            print("[w] Not possible to determine cluster node IP from node name, no record in /etc/hosts! - "+cluster_nodes[node]['name'] + " sosreport: "+sosreport_path)
 
 for sosreport in sosreport_list:
     # initial variable setup
