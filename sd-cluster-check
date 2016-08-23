@@ -21,6 +21,17 @@ import xml.etree.ElementTree as ET
 # find the all sosreports
 clusters = {}
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 ### parsing input paths
 import getopt, sys
 import subprocess
@@ -221,23 +232,27 @@ for sosreport in sosreport_list:
 print("============ detected " + str(len(clusters)) + " cluster(s)")
 #from operator import attrgetter, itemgetter
 for cl in clusters:
-    print("==== " + cl + " ( " + clusters[cl]['type'] + " )")
-    print("{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format('#','node name', 'sos', 'crm', 'heartbeat IP'))
-    #for n in clusters[cl]:
+    print("==== " + bcolors.HEADER + cl + bcolors.ENDC  + " ( " + clusters[cl]['type'] + " )")
+#    print("{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format('#','node name', 'sos', 'crm', 'heartbeat IP'))
+    if clusters[cl]['type'] == 'pacemaker':
+        print("{0:2s} {1:15s}  {2:3s}  {3:3s}  {4:20s}".format('#','heartbeat IP', 'sos', 'crm', 'node name'))
+    elif clusters[cl]['type'] == 'rgmanager':
+        print("{0:2s} {1:15s}  {2:3s}       {3:20s}".format('#','heartbeat IP', 'sos', 'node name'))
+
     for n in sorted(clusters[cl]['nodes'], key=int):
         if 'has_sos_report' in clusters[cl]['nodes'][n]:
-            has_sos = 'yes'
+            has_sos = bcolors.OKGREEN + 'yes' + bcolors.ENDC
         else:
-            has_sos = 'NO'
+            has_sos = bcolors.FAIL + 'NO' + bcolors.ENDC
         if 'has_crm_report' in clusters[cl]['nodes'][n]:
-            has_crm = 'yes'
+            has_crm = bcolors.OKGREEN + 'yes' + bcolors.ENDC
         else:
-            has_crm = 'NO'
+            has_crm = bcolors.FAIL + 'NO' + bcolors.ENDC
         if 'ip' in clusters[cl]['nodes'][n] and '==global==' in clusters[cl]['nodes'][n]['ip']:
-            show_ip = clusters[cl]['nodes'][n]['ip']['==global==']
+            show_ip = bcolors.OKCYAN + clusters[cl]['nodes'][n]['ip']['==global=='] + bcolors.ENDC
         else:
-            show_ip = 'undetected'
+            show_ip = bcolors.WARNING + 'undetected' + bcolors.ENDC
         if clusters[cl]['type'] == 'pacemaker':
-            print("{0:2s} {1:20s} {2:3s} {3:3s} {4:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_sos, has_crm, show_ip))
+            print("{0:2s} {1:24s}  {2:13s} {3:13s} {4:15s}".format(n, show_ip, has_sos, has_crm, clusters[cl]['nodes'][n]['name']))
         elif clusters[cl]['type'] == 'rgmanager':
-            print("{0:2s} {1:20s} {2:7s} {3:15s}".format(n, clusters[cl]['nodes'][n]['name'], has_sos, show_ip))
+            print("{0:2s} {1:24s}  {2:13s}      {3:15s}".format(n, show_ip, has_sos, clusters[cl]['nodes'][n]['name']))
