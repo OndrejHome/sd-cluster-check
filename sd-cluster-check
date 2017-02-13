@@ -194,6 +194,8 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
                 cluster_nodes[node]['has_sos_report'] = True
                 if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+cluster_nodes[node]['name'])):
                     cluster_nodes[node]['has_crm_report'] = True
+                if (os.path.isdir(sosreport+'/sos_commands/pacemaker/crm_report/'+cluster_nodes[node]['name'])):
+                    cluster_nodes[node]['has_crm_report'] = True
         else:
             print("[w] Not possible to determine cluster node IP from node name, no record in /etc/hosts! - "+cluster_nodes[node]['name'] + " sosreport: "+sosreport_path)
 
