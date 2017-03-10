@@ -168,6 +168,9 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
         mymatch = None
         node_ip = ""
         host_match = re.compile(r"^(?P<ip>\d+\.\d+\.\d+\.\d+).*\s+" + cluster_nodes[node]['name'] + "(\s+.*|$)")
+        if not (os.path.isfile(sosreport_path+'/etc/hosts')):
+            continue
+            print("[w] /etc/hosts not found in sosreport for node " + node)
         hosts_file = open(sosreport_path+'/etc/hosts','r')
         # find first matching hostname with IP
         for line in hosts_file.readlines():
