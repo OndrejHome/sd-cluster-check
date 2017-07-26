@@ -36,10 +36,15 @@ class bcolors:
 import getopt, sys
 import subprocess
 try:
-    opts, args = getopt.getopt(sys.argv,"h",[])
+    opts, args = getopt.getopt(sys.argv[1:],"hv",[])
 except getopt.GetoptError:
     print("error parsing arguments")
     sys.exit(2)
+
+verbose=False
+for o, a in opts:
+    if o == '-v':
+        verbose=True
 
 print("== sd-cluster-check v0.2 ==")
 if len(sys.argv) == 1:
@@ -63,7 +68,7 @@ ofamera@redhat.com
 
 sosreport_list = []
 print("Searching for sosreports in given path(s)")
-for path in args[1:]:
+for path in args:
     if (os.path.isdir(path)):
         print("path: "+path)
         output = subprocess.check_output("find "+path+" -maxdepth 3 -name sos_commands -type d", shell=True)
@@ -199,6 +204,23 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
                     cluster_nodes[node]['has_crm_report'] = True
                 if (os.path.isdir(sosreport+'/sos_commands/pacemaker/crm_report/'+cluster_nodes[node]['name'])):
                     cluster_nodes[node]['has_crm_report'] = True
+
+                ## add the reference to sosreport to node from which it is
+                if 'sosreports' not in cluster_nodes[node]:
+                    cluster_nodes[node]['sosreports'] = {}
+                # determine sosreport date
+                sosreport_date = 'unknown'
+                if not (os.path.isfile(sosreport_path+'/date')):
+                    print '[w] there is no "date" file to determine from which time is sosreport'
+                else:
+                   sosreport_date = open(sosreport_path+'/date','r').read().replace('\n','')
+                if sosreport_date in cluster_nodes[node]['sosreports']:
+                    print '[w] seems that we have 2 sosreport from same node and with same time'
+                    print '    1. '+cluster_nodes[node]['sosreports'][sosreport_date]
+                    print '    2. '+sosreport_path
+                    continue
+                else:
+                    cluster_nodes[node]['sosreports'][sosreport_date] = sosreport_path
         else:
             print("[w] Not possible to determine cluster node IP from node name, no record in /etc/hosts! - "+cluster_nodes[node]['name'] + " sosreport: "+sosreport_path)
 
@@ -261,3 +283,5 @@ for cl in clusters:
             print("{0:2s} {1:24s}  {2:13s} {3:13s} {4:15s}".format(n, show_ip, has_sos, has_crm, clusters[cl]['nodes'][n]['name']))
         elif clusters[cl]['type'] == 'rgmanager':
             print("{0:2s} {1:24s}  {2:13s}      {3:15s}".format(n, show_ip, has_sos, clusters[cl]['nodes'][n]['name']))
+        if verbose:
+            print clusters[cl]['nodes'][n]['sosreports'].keys()
