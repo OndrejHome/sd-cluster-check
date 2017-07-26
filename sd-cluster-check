@@ -211,13 +211,13 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
                 # determine sosreport date
                 sosreport_date = 'unknown'
                 if not (os.path.isfile(sosreport_path+'/date')):
-                    print '[w] there is no "date" file to determine from which time is sosreport'
+                    print('[w] there is no "date" file to determine from which time is sosreport')
                 else:
                    sosreport_date = open(sosreport_path+'/date','r').read().replace('\n','')
                 if sosreport_date in cluster_nodes[node]['sosreports']:
-                    print '[w] seems that we have 2 sosreport from same node and with same time'
-                    print '    1. '+cluster_nodes[node]['sosreports'][sosreport_date]
-                    print '    2. '+sosreport_path
+                    print('[w] seems that we have 2 sosreport from same node and with same time')
+                    print('    1. '+cluster_nodes[node]['sosreports'][sosreport_date])
+                    print('    2. '+sosreport_path)
                     continue
                 else:
                     cluster_nodes[node]['sosreports'][sosreport_date] = sosreport_path
@@ -284,4 +284,8 @@ for cl in clusters:
         elif clusters[cl]['type'] == 'rgmanager':
             print("{0:2s} {1:24s}  {2:13s}      {3:15s}".format(n, show_ip, has_sos, clusters[cl]['nodes'][n]['name']))
         if verbose:
-            print clusters[cl]['nodes'][n]['sosreports'].keys()
+            if 'sosreports' in clusters[cl]['nodes'][n]:
+                for sos in clusters[cl]['nodes'][n]['sosreports']:
+                    print('   - '+sos+' - '+clusters[cl]['nodes'][n]['sosreports'][sos])
+            else:
+                print('[ no sosreports for this node]')
