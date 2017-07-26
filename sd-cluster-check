@@ -191,8 +191,8 @@ def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
             elif cluster_nodes[node]['ip']['==global=='] != node_ip:
                 print("[w] Inconsistent naming in /etc/hosts accross nodes detected !!!")
             cluster_nodes[node]['ip'][hostname] = node_ip
-            ## checing if we can match IP to this host sosreport
 
+            ## checking if we can match IP to this host sosreport
             if check_ip (sosreport_path, node_ip):
                 cluster_nodes[node]['has_sos_report'] = True
                 if (os.path.isdir(sosreport+'/sos_commands/cluster/crm_report/'+cluster_nodes[node]['name'])):
@@ -207,8 +207,8 @@ for sosreport in sosreport_list:
     cluster_name = ""
 
     # warn if no /sos_commands/cluster directory is found - most probably this won't be a cluster
-    if not (os.path.isdir(sosreport+'/sos_commands/cluster')):
-        print("[w] sos_commands/cluster not present in "+sosreport)
+    if not (os.path.isdir(sosreport+'/sos_commands/cluster')) and not (os.path.isdir(sosreport+'/sos_commands/pacemaker')):
+        print("[w] sos_commands/cluster nor sos_commands/pacemaker are present in "+sosreport)
 
     # 1. try to determine cluster_name
     #    -> this will also tell us if this is rgmanager or pacemaker cluster
