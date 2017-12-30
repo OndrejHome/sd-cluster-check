@@ -46,11 +46,11 @@ for o, a in opts:
     if o == '-v':
         verbose=True
 
-print("== sd-cluster-check v0.2 ==")
+print("== sd-cluster-check v0.3 ==")
 if len(sys.argv) == 1:
     print ("""
-sd-cluster-check path/sos_report1 [path/sos_report2] ...
-sd-cluster-check path/dir_with_sosreports1 [path/dir_with_sosreports2] ...
+sd-cluster-check [-v] path/sos_report1 [path/sos_report2] ...
+sd-cluster-check [-v] path/dir_with_sosreports1 [path/dir_with_sosreports2] ...
 
 This script takes as parameters directory with unpacked sosreports or
 directory contatining directories with unpacked sosreports.
@@ -59,6 +59,8 @@ You can provide multiple parameters with paths.
 As output you will get basic information about HA clusters detected in
 sosreports and information about the nodes for which the sosreports were provided.
 Thanks to that you can tell from which nodes you are missing sosreports.
+When the '-v' argument is passed the summary will contain path to sosreports to
+given nodes (except of duplicates).
 
 To request features or report bug you can create issue on github or email it.
 https://github.com/OndrejHome/sd-cluster-check/issues
