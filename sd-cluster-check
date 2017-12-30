@@ -71,7 +71,11 @@ print("Searching for sosreports in given path(s)")
 for path in args:
     if (os.path.isdir(path)):
         print("path: "+path)
-        output = subprocess.check_output("find "+path+" -maxdepth 3 -name sos_commands -type d", shell=True)
+        try:
+            output = subprocess.check_output("find "+path+" -maxdepth 3 -name sos_commands -type d", shell=True)
+        except subprocess.CalledProcessError as e:
+            # use output even if we receive errors from 'find' command
+            output = e.output
         for row in output.decode('utf-8').split('\n'):
             if len(row) > 0:
                 row_data = row.split('/')
