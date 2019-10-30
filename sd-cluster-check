@@ -174,7 +174,12 @@ def parse_cluster_conf_nodes ( sosreport_path, cluster_nodes ):
             cluster_nodes[node.attrib['nodeid']] = { 'name': node.attrib['name'], 'node_id': node.attrib['nodeid'] }
 
 def match_nodes_to_hosts ( sosreport_path, cluster_nodes ):
-    hostname = open(sosreport_path+'/sos_commands/general/hostname','r').readlines()[0].rstrip('\n')
+    if (os.path.isfile(sosreport_path+'/sos_commands/general/hostname')):
+        hostname = open(sosreport_path+'/sos_commands/general/hostname','r').readlines()[0].rstrip('\n')
+    elif (os.path.isfile(sosreport_path+'/sos_commands/host/hostname')):
+        hostname = open(sosreport_path+'/sos_commands/host/hostname','r').readlines()[0].rstrip('\n')
+    else:
+        hostname = 'unknown'
     for node in cluster_nodes:
         mymatch = None
         node_ip = ""
